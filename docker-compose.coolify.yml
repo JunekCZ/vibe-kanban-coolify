@@ -1,0 +1,91 @@
+services:
+  remote-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+    environment:
+      POSTGRES_DB: remote
+      POSTGRES_USER: remote
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?}
+    volumes:
+      - remote-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U remote -d remote
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  remote-server:
+    build:
+      context: .
+      dockerfile: crates/remote/Dockerfile
+      args:
+        VITE_RELAY_API_BASE_URL: ""
+    restart: unless-stopped
+    expose:
+      - "8081"
+    environment:
+      RUST_LOG: info,remote=info
+      SERVER_DATABASE_URL: "postgres://remote:${DB_PASSWORD:?}@remote-db:5432/remote"
+      SERVER_LISTEN_ADDR: "0.0.0.0:8081"
+      SERVER_PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?}
+
+      ELECTRIC_URL: "http://electric:3000"
+      ELECTRIC_ROLE_PASSWORD: ${ELECTRIC_ROLE_PASSWORD:?}
+      VIBEKANBAN_REMOTE_JWT_SECRET: ${VIBEKANBAN_REMOTE_JWT_SECRET:?}
+
+      SELF_HOST_LOCAL_AUTH_EMAIL: ${ADMIN_EMAIL:?}
+      SELF_HOST_LOCAL_AUTH_PASSWORD: ${ADMIN_PASSWORD:?}
+
+      GITHUB_OAUTH_CLIENT_ID: ""
+      GITHUB_OAUTH_CLIENT_SECRET: ""
+      GOOGLE_OAUTH_CLIENT_ID: ""
+      GOOGLE_OAUTH_CLIENT_SECRET: ""
+
+      LOOPS_EMAIL_API_KEY: ""
+
+    depends_on:
+      remote-db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --spider
+        - -q
+        - http://127.0.0.1:8081/v1/health
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
+  electric:
+    image: electricsql/electric:1.4.13
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      DATABASE_URL: "postgresql://electric_sync:${ELECTRIC_ROLE_PASSWORD:?}@remote-db:5432/remote?sslmode=disable"
+      PG_PROXY_PORT: "65432"
+      LOGICAL_PUBLISHER_HOST: electric
+      AUTH_MODE: insecure
+      ELECTRIC_INSECURE: "true"
+      ELECTRIC_MANUAL_TABLE_PUBLISHING: "true"
+      ELECTRIC_USAGE_REPORTING: "false"
+      ELECTRIC_FEATURE_FLAGS: "allow_subqueries,tagged_subqueries"
+    volumes:
+      - electric-data:/app/persistent
+    depends_on:
+      remote-db:
+        condition: service_healthy
+      remote-server:
+        condition: service_healthy
+
+volumes:
+  remote-db-data:
+  electric-data:
