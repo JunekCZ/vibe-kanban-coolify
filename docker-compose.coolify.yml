@@ -26,7 +26,7 @@ services:
       context: .
       dockerfile: crates/remote/Dockerfile
       args:
-        VITE_RELAY_API_BASE_URL: ""
+        VITE_RELAY_API_BASE_URL: ${RELAY_PUBLIC_URL:-https://relay.occamy.cz}
     restart: unless-stopped
     expose:
       - "8081"
@@ -86,6 +86,65 @@ services:
       remote-server:
         condition: service_healthy
 
+  relay-server:
+    build:
+      context: .
+      dockerfile: crates/relay-tunnel/Dockerfile
+    restart: unless-stopped
+    expose:
+      - "8082"
+    depends_on:
+      remote-db:
+        condition: service_healthy
+    environment:
+      RUST_LOG: info
+      SERVER_DATABASE_URL: "postgres://remote:${DB_PASSWORD:?}@remote-db:5432/remote"
+      RELAY_LISTEN_ADDR: "0.0.0.0:8082"
+      VIBEKANBAN_REMOTE_JWT_SECRET: ${VIBEKANBAN_REMOTE_JWT_SECRET:?}
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8082/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
+  execution-host:
+    build:
+      context: .
+      dockerfile: Dockerfile.execution-host
+    restart: unless-stopped
+    expose:
+      - "3000"
+    ports:
+      - "127.0.0.1:3010:3000"
+    depends_on:
+      remote-db:
+        condition: service_healthy
+    volumes:
+      - execution-host-repos:/repos
+      - execution-host-data:/home/appuser/.local/share/ai/bloop/vibe-kanban
+      - execution-host-opencode:/home/appuser/.local/share/opencode
+      - execution-host-opencode-config:/home/appuser/.config/opencode
+      - execution-host-gh:/home/appuser/.config/gh
+    environment:
+      HOST: 0.0.0.0
+      PORT: "3000"
+      BACKEND_PORT: "3000"
+      VK_SHARED_API_BASE: https://kanban.occamy.cz
+      VK_SHARED_RELAY_API_BASE: https://relay.occamy.cz
+      RUST_LOG: info,server=info,local_deployment=info
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
 volumes:
   remote-db-data:
   electric-data:
+  execution-host-repos:
+  execution-host-data:
+  execution-host-opencode:
+  execution-host-opencode-config:
+  execution-host-gh:
