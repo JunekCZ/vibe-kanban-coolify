@@ -43,8 +43,7 @@ dev_assets/
 dev_assets_seed/
 
 # Docker
-Dockerfile*
-.dockerignore
+# (Dockerfiles are passed explicitly via -f and are not valid context entries)
 
 # Environment files
 .env
