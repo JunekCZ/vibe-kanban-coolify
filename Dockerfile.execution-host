@@ -167,7 +167,10 @@ RUN mkdir -p /repos \
 # Pre-create runtime user home paths so freshly mounted named volumes
 # (owned by root when created by Docker) are writable by the unprivileged
 # runtime user (uid 10001).
-RUN mkdir -p /home/appuser/.local/share/ai/bloop/vibe-kanban \
+# On Linux, `directories::ProjectDirs` resolves the application data dir to
+# $XDG_DATA_HOME/<app>, i.e. ~/.local/share/vibe-kanban (not the macOS path
+# ~/Library/Application Support/ai.bloop.vibe-kanban).
+RUN mkdir -p /home/appuser/.local/share/vibe-kanban \
   /home/appuser/.local/share/opencode \
   /home/appuser/.config/opencode \
   /home/appuser/.config/gh \

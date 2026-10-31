@@ -122,7 +122,7 @@ services:
         condition: service_healthy
     volumes:
       - execution-host-repos:/repos
-      - execution-host-data:/home/appuser/.local/share/ai/bloop/vibe-kanban
+      - execution-host-data:/home/appuser/.local/share/vibe-kanban
       - execution-host-opencode:/home/appuser/.local/share/opencode
       - execution-host-opencode-config:/home/appuser/.config/opencode
       - execution-host-gh:/home/appuser/.config/gh
